@@ -1,0 +1,45 @@
+pipeline{
+	agent any
+
+	environment {
+		AEM_PROTOCOL = "http"
+        AEM_HOST = "localhost"
+        AEM_PORT = "4502"
+        PACKAGE_MANAGER_URL = "crx/packmgr/service.jsp"
+        AEM_USER = "admin"
+        AEM_PASSWORD = "admin"
+    }
+
+	stages{
+		stage('Clear Workspace'){
+			steps{
+				deleteDir()
+			}
+		}
+		stage('Checkout code'){
+			steps{
+				checkout([$class: 'GitSCM', 
+					branches: [[name: 'origin/master']],
+     				userRemoteConfigs: [[url: 'https://github.com/jatingupta030/jenkins-poc.git']]])
+			}
+		}
+		stage('Code Unit Test'){
+			steps{
+				sh 'mvn clean install'
+			}
+		}
+		stage('Deploy Code to Author'){
+			steps{
+				script{
+					def url = "${AEM_PROTOCOL}://${AEM_HOST}:${AEM_PORT}/${PACKAGE_MANAGER_URL}"
+					sh "echo ${url}"
+					installAEMPackage(url, AEM_USER, AEM_PASSWORD, "jenkins-poc.ui.apps-1.0-SNAPSHOT.zip")
+				}
+			}
+		}
+	}
+}
+
+def installAEMPackage(url, username, password, packageName){
+	sh "curl -u ${username}:${password} -F file=@${WORKSPACE}/ui.apps/target/${packageName} -F name=${packageName} -F force=true -F acHandling=ignore -F install=true ${url}"        
+}
